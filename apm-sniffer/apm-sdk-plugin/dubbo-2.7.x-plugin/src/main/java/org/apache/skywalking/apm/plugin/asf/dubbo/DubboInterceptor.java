@@ -19,6 +19,7 @@
 
 package org.apache.skywalking.apm.plugin.asf.dubbo;
 
+import com.google.gson.Gson;
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.rpc.Invocation;
 import org.apache.dubbo.rpc.Invoker;
@@ -63,6 +64,26 @@ public class DubboInterceptor implements InstanceMethodsAroundInterceptor {
 
         final String host = requestURL.getHost();
         final int port = requestURL.getPort();
+
+        String params = null;
+        String paramtypes = null;
+        try {
+            Class[] parameterTypes = invocation.getParameterTypes();
+            StringBuilder sb = new StringBuilder();
+            if (parameterTypes != null && parameterTypes.length > 0) {
+                for (int i = 0; i < parameterTypes.length; i++) {
+                    Class cls = parameterTypes[i];
+                    sb.append(cls.getName());
+                    if (i != parameterTypes.length - 1) {
+                        sb.append(",");
+                    }
+                }
+            }
+            paramtypes = sb.toString();
+            params = new Gson().toJson(invocation.getArguments());
+        } catch (Exception e) {
+
+        }
         if (isConsumer) {
             final ContextCarrier contextCarrier = new ContextCarrier();
             span = ContextManager.createExitSpan(generateOperationName(requestURL, invocation), contextCarrier, host + ":" + port);
@@ -85,6 +106,8 @@ public class DubboInterceptor implements InstanceMethodsAroundInterceptor {
         }
 
         Tags.URL.set(span, generateRequestURL(requestURL, invocation));
+        span.tag("paramtypes", paramtypes);
+        span.tag("params", params);
         span.setComponent(ComponentsDefine.DUBBO);
         SpanLayer.asRPCFramework(span);
     }
@@ -93,8 +116,12 @@ public class DubboInterceptor implements InstanceMethodsAroundInterceptor {
     public Object afterMethod(EnhancedInstance objInst, Method method, Object[] allArguments,
         Class<?>[] argumentsTypes, Object ret) throws Throwable {
         Result result = (Result)ret;
-        if (result != null && result.getException() != null) {
-            dealException(result.getException());
+        if (result != null) {
+            if (result.getException() != null) {
+                dealException(result.getException());
+            } else {
+                dealValue(result.getValue());
+            }
         }
 
         ContextManager.stopSpan();
@@ -114,6 +141,11 @@ public class DubboInterceptor implements InstanceMethodsAroundInterceptor {
         AbstractSpan span = ContextManager.activeSpan();
         span.errorOccurred();
         span.log(throwable);
+    }
+
+    private void dealValue(Object value) {
+        AbstractSpan span = ContextManager.activeSpan();
+        span.tag("result", new Gson().toJson(value));
     }
 
     /**
