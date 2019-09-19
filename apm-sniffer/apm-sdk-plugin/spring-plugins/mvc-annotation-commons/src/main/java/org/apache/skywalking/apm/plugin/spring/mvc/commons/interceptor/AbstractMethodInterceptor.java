@@ -18,6 +18,7 @@
 
 package org.apache.skywalking.apm.plugin.spring.mvc.commons.interceptor;
 
+import com.google.gson.Gson;
 import java.lang.reflect.Method;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -101,6 +102,10 @@ public abstract class AbstractMethodInterceptor implements InstanceMethodsAround
                 AbstractSpan span = ContextManager.createEntrySpan(operationName, contextCarrier);
                 Tags.URL.set(span, request.getRequestURL().toString());
                 Tags.HTTP.METHOD.set(span, request.getMethod());
+                span.tag("method", buildOperationName(objInst, method));
+                span.tag("paramTypes", buildParamTypes(argumentsTypes));
+                span.tag("params", buildParams(allArguments));
+
                 span.setComponent(ComponentsDefine.SPRING_MVC_ANNOTATION);
                 SpanLayer.asHttp(span);
 
@@ -114,6 +119,24 @@ public abstract class AbstractMethodInterceptor implements InstanceMethodsAround
 
             stackDepth.increment();
         }
+    }
+
+    private String buildParamTypes(Class[] parameterTypes) {
+        StringBuilder sb = new StringBuilder();
+        if (parameterTypes != null && parameterTypes.length > 0) {
+            for (int i = 0; i < parameterTypes.length; i++) {
+                Class cls = parameterTypes[i];
+                sb.append(cls.getName());
+                if (i != parameterTypes.length - 1) {
+                    sb.append(",");
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    private String buildParams(Object[] allArguments) {
+        return new Gson().toJson(allArguments);
     }
 
     private String buildOperationName(Object invoker, Method method) {
@@ -164,6 +187,7 @@ public abstract class AbstractMethodInterceptor implements InstanceMethodsAround
                     span.errorOccurred();
                     Tags.STATUS_CODE.set(span, Integer.toString(response.getStatus()));
                 }
+                span.tag("result", new Gson().toJson(ret));
 
                 ContextManager.getRuntimeContext().remove(REQUEST_KEY_IN_RUNTIME_CONTEXT);
                 ContextManager.getRuntimeContext().remove(RESPONSE_KEY_IN_RUNTIME_CONTEXT);
