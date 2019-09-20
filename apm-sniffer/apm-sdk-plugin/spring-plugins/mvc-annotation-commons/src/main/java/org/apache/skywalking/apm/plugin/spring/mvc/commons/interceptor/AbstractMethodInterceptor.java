@@ -18,7 +18,10 @@
 
 package org.apache.skywalking.apm.plugin.spring.mvc.commons.interceptor;
 
+import com.google.gson.ExclusionStrategy;
+import com.google.gson.FieldAttributes;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import java.lang.reflect.Method;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -42,6 +45,7 @@ import static org.apache.skywalking.apm.plugin.spring.mvc.commons.Constants.CONT
 import static org.apache.skywalking.apm.plugin.spring.mvc.commons.Constants.FORWARD_REQUEST_FLAG;
 import static org.apache.skywalking.apm.plugin.spring.mvc.commons.Constants.REQUEST_KEY_IN_RUNTIME_CONTEXT;
 import static org.apache.skywalking.apm.plugin.spring.mvc.commons.Constants.RESPONSE_KEY_IN_RUNTIME_CONTEXT;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * the abstract method interceptor
@@ -135,8 +139,26 @@ public abstract class AbstractMethodInterceptor implements InstanceMethodsAround
         return sb.toString();
     }
 
+    private ExclusionStrategy strategy = new ExclusionStrategy() {
+        @Override
+        public boolean shouldSkipField(FieldAttributes field) {
+            return false;
+        }
+
+        @Override
+        public boolean shouldSkipClass(Class<?> clazz) {
+            return HttpServletRequest.class.isAssignableFrom(clazz)
+                    || HttpServletResponse.class.isAssignableFrom(clazz)
+                    || MultipartFile.class.isAssignableFrom(clazz);
+        }
+    };
+
+    private Gson gson = new GsonBuilder()
+            .addSerializationExclusionStrategy(strategy)
+            .create();
+
     private String buildParams(Object[] allArguments) {
-        return new Gson().toJson(allArguments);
+        return gson.toJson(allArguments);
     }
 
     private String buildOperationName(Object invoker, Method method) {
