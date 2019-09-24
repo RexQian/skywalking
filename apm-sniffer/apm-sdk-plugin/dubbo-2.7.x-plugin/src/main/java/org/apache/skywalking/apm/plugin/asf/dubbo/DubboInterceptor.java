@@ -19,7 +19,10 @@
 
 package org.apache.skywalking.apm.plugin.asf.dubbo;
 
+import com.google.gson.ExclusionStrategy;
+import com.google.gson.FieldAttributes;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.rpc.Invocation;
 import org.apache.dubbo.rpc.Invoker;
@@ -80,7 +83,7 @@ public class DubboInterceptor implements InstanceMethodsAroundInterceptor {
                 }
             }
             paramtypes = sb.toString();
-            params = new Gson().toJson(invocation.getArguments());
+            params = gson.toJson(invocation.getArguments());
         } catch (Exception e) {
 
         }
@@ -111,6 +114,22 @@ public class DubboInterceptor implements InstanceMethodsAroundInterceptor {
         span.setComponent(ComponentsDefine.DUBBO);
         SpanLayer.asRPCFramework(span);
     }
+
+    private ExclusionStrategy strategy = new ExclusionStrategy() {
+        @Override
+        public boolean shouldSkipField(FieldAttributes field) {
+            return field.getName().toLowerCase().contains("password");
+        }
+
+        @Override
+        public boolean shouldSkipClass(Class<?> clazz) {
+            return false;
+        }
+    };
+
+    private Gson gson = new GsonBuilder()
+            .addSerializationExclusionStrategy(strategy)
+            .create();
 
     @Override
     public Object afterMethod(EnhancedInstance objInst, Method method, Object[] allArguments,
@@ -145,7 +164,7 @@ public class DubboInterceptor implements InstanceMethodsAroundInterceptor {
 
     private void dealValue(Object value) {
         AbstractSpan span = ContextManager.activeSpan();
-        span.tag("result", new Gson().toJson(value));
+        span.tag("result", gson.toJson(value));
     }
 
     /**

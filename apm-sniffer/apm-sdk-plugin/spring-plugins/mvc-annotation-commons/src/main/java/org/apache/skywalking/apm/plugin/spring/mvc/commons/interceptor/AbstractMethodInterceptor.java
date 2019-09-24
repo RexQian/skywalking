@@ -142,7 +142,7 @@ public abstract class AbstractMethodInterceptor implements InstanceMethodsAround
     private ExclusionStrategy strategy = new ExclusionStrategy() {
         @Override
         public boolean shouldSkipField(FieldAttributes field) {
-            return false;
+            return field.getName().toLowerCase().contains("password");
         }
 
         @Override
